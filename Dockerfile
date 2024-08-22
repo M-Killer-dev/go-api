@@ -1,26 +1,32 @@
-# Use the official Golang image as a base
-FROM golang:1.20-alpine
+# Stage 1: Build the Go application
+FROM golang:1.20-alpine AS builder
 
-# Install curl
-RUN apk --no-cache add curl
-
-# Set the working directory inside the container
+# Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy the Go module files
-COPY go.mod ./
+# Copy go.mod and go.sum files
+COPY go.mod go.sum ./
 
-# Download dependencies
+# Download all dependencies. Dependencies will be cached if go.mod and go.sum are not changed
 RUN go mod download
 
-# Copy the source code
+# Copy the source code into the container
 COPY . .
 
 # Build the Go application
-RUN go build -o /go-api
+RUN go build -o go-api .
 
-# Expose port 3000 to the outside world
+# Stage 2: Create a smaller image for running the Go application
+FROM alpine:latest
+
+# Set environment variables
+ENV GO_ENV=production
+
+# Expose the application on port 3000
 EXPOSE 3000
 
-# Command to run the executable
-CMD [ "/go-api" ]
+# Copy the binary from the builder stage
+COPY --from=builder /app/go-api /go-api
+
+# Run the Go application
+CMD ["/go-api"]
